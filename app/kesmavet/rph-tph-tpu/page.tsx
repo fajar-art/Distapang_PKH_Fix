@@ -1,14 +1,32 @@
 'use client';
+
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import * as XLSX from 'xlsx';
-
-// ============================================================
-// CATATAN INSTALASI
-// Fitur export Excel butuh library "xlsx" (SheetJS).
-// Jalankan di root project Next.js Anda:
-//   npm install xlsx
-// ============================================================
+import {
+  ArrowLeft,
+  Download,
+  Plus,
+  Search,
+  Edit2,
+  Trash2,
+  X,
+  CheckCircle2,
+  Layers,
+  Phone,
+  MapPin,
+  ShieldCheck,
+  Building2,
+  Filter,
+  FileText,
+  UploadCloud,
+  Eye,
+  Paperclip,
+  Image as ImageIcon,
+  FileCheck,
+  FileSpreadsheet,
+  ExternalLink,
+} from 'lucide-react';
 
 // Data JSON Pelaku Usaha Pemotongan Hewan (101 Entri Awal)
 const initialDataRph = [
@@ -1445,8 +1463,30 @@ const initialDataRph = [
   },
 ];
 
-// Tipe data satu entri, diturunkan otomatis dari initialDataRph
-type RphItem = (typeof initialDataRph)[number];
+// Tipe data satu entri unit pemotongan dengan dukungan upload berkas
+export interface RphItem {
+  no: number;
+  lokasi_desa_kecamatan_alamat_pemilik?: string;
+  nama_tph_r_u?: string;
+  jenis_unit_usaha?: string;
+  pemilik?: string;
+  no_telp?: string;
+  status_ijin_usaha?: string;
+  lokasi_rpu?: string;
+  pemotongan_per_hari_ekor?: string;
+  sertifikat_halal?: string;
+  sertifikat_nkv?: string;
+  rata2_produksi_per_bulan_kg?: string;
+  // Upload berkas dokumen
+  file_sertifikat_halal?: string;
+  file_sertifikat_halal_name?: string;
+  file_sertifikat_nkv?: string;
+  file_sertifikat_nkv_name?: string;
+  file_izin_usaha?: string;
+  file_izin_usaha_name?: string;
+  file_foto_fasilitas?: string;
+  file_foto_fasilitas_name?: string;
+}
 
 const LS_KEY = 'data_rph_tph_tpu_v1';
 
@@ -1455,7 +1495,7 @@ const emptyForm: RphItem = {
   no: 0,
   lokasi_desa_kecamatan_alamat_pemilik: '',
   nama_tph_r_u: '',
-  jenis_unit_usaha: '',
+  jenis_unit_usaha: 'TPU',
   pemilik: '',
   no_telp: '',
   status_ijin_usaha: '',
@@ -1464,31 +1504,52 @@ const emptyForm: RphItem = {
   sertifikat_halal: '',
   sertifikat_nkv: '',
   rata2_produksi_per_bulan_kg: '',
+  file_sertifikat_halal: '',
+  file_sertifikat_halal_name: '',
+  file_sertifikat_nkv: '',
+  file_sertifikat_nkv_name: '',
+  file_izin_usaha: '',
+  file_izin_usaha_name: '',
+  file_foto_fasilitas: '',
+  file_foto_fasilitas_name: '',
 };
 
 const FIELD_LABELS: Record<string, string> = {
-  nama_tph_r_u: 'Nama TPH/RPU',
+  nama_tph_r_u: 'Nama TPH/RPU / Unit Usaha',
   jenis_unit_usaha: 'Jenis Unit Usaha',
-  pemilik: 'Pemilik',
-  no_telp: 'No. Telp',
-  status_ijin_usaha: 'Status Ijin Usaha',
-  lokasi_rpu: 'Lokasi RPU/TPH',
-  lokasi_desa_kecamatan_alamat_pemilik: 'Lokasi Desa/Kecamatan/Alamat Pemilik',
-  pemotongan_per_hari_ekor: 'Pemotongan per Hari (ekor)',
-  sertifikat_halal: 'Sertifikat Halal',
-  sertifikat_nkv: 'Sertifikat NKV',
-  rata2_produksi_per_bulan_kg: 'Rata-rata Produksi per Bulan (kg)',
+  pemilik: 'Nama Pemilik / Pengelola',
+  no_telp: 'No. Telp / WhatsApp',
+  status_ijin_usaha: 'Status Ijin Usaha / Legalitas',
+  lokasi_rpu: 'Lokasi RPU / TPH',
+  lokasi_desa_kecamatan_alamat_pemilik: 'Lokasi Desa / Kecamatan / Alamat Lengkap',
+  pemotongan_per_hari_ekor: 'Estimasi Pemotongan per Hari (ekor)',
+  sertifikat_halal: 'Keterangan Sertifikat Halal',
+  sertifikat_nkv: 'Keterangan Sertifikat NKV',
+  rata2_produksi_per_bulan_kg: 'Rata-rata Produksi Daging per Bulan (kg)',
 };
 
 export default function RphTphTpuPage() {
-  const [dataRph, setDataRph] = useState<RphItem[]>(initialDataRph);
+  const [dataRph, setDataRph] = useState<RphItem[]>(initialDataRph as RphItem[]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedKategori, setSelectedKategori] = useState('Semua');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingNo, setEditingNo] = useState<number | null>(null); // null = mode tambah
+  const [editingNo, setEditingNo] = useState<number | null>(null);
   const [formValues, setFormValues] = useState<RphItem>(emptyForm);
   const [confirmDeleteNo, setConfirmDeleteNo] = useState<number | null>(null);
 
-  // Muat data tersimpan dari localStorage (jika petugas pernah menambah/mengubah sebelumnya)
+  // State untuk modal pratinjau dokumen / PDF / Foto
+  const [previewDoc, setPreviewDoc] = useState<{
+    isOpen: boolean;
+    title: string;
+    url: string;
+    fileName: string;
+  }>({
+    isOpen: false,
+    title: '',
+    url: '',
+    fileName: '',
+  });
+
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem(LS_KEY);
@@ -1503,7 +1564,6 @@ export default function RphTphTpuPage() {
     }
   }, []);
 
-  // Simpan otomatis setiap kali data berubah
   useEffect(() => {
     try {
       window.localStorage.setItem(LS_KEY, JSON.stringify(dataRph));
@@ -1512,17 +1572,20 @@ export default function RphTphTpuPage() {
     }
   }, [dataRph]);
 
-  // Filter data berdasarkan input pencarian
-  const filteredData = dataRph.filter(
-    (item) =>
-      (item.nama_tph_r_u || '')
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
+  const filteredData = dataRph.filter((item) => {
+    const matchSearch =
+      (item.nama_tph_r_u || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (item.pemilik || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (item.lokasi_rpu || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+      (item.lokasi_rpu || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.lokasi_desa_kecamatan_alamat_pemilik || '').toLowerCase().includes(searchTerm.toLowerCase());
 
-  // ---------- MODAL TAMBAH / EDIT ----------
+    const matchKategori =
+      selectedKategori === 'Semua' ||
+      (item.jenis_unit_usaha || '').toUpperCase().includes(selectedKategori.toUpperCase());
+
+    return matchSearch && matchKategori;
+  });
+
   const openAddModal = () => {
     setEditingNo(null);
     setFormValues(emptyForm);
@@ -1541,45 +1604,103 @@ export default function RphTphTpuPage() {
     setFormValues(emptyForm);
   };
 
-  const handleFieldChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFieldChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormValues((prev) => ({ ...prev, [name]: value }));
   };
 
+  // Handler Upload Berkas File (PDF / Gambar)
+  const handleFileUpload = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    fieldKey: 'file_sertifikat_halal' | 'file_sertifikat_nkv' | 'file_izin_usaha' | 'file_foto_fasilitas',
+    nameKey: 'file_sertifikat_halal_name' | 'file_sertifikat_nkv_name' | 'file_izin_usaha_name' | 'file_foto_fasilitas_name'
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 15 * 1024 * 1024) {
+      alert('Ukuran berkas maksimal 15 MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      setFormValues((prev) => {
+        const next = {
+          ...prev,
+          [fieldKey]: base64,
+          [nameKey]: file.name,
+        };
+        // Auto-sinkronisasi teks keterangan jika kosong
+        if (fieldKey === 'file_sertifikat_halal' && (!prev.sertifikat_halal || prev.sertifikat_halal.toLowerCase().includes('belum'))) {
+          next.sertifikat_halal = 'Sudah Halal (Berkas Terlampir)';
+        }
+        if (fieldKey === 'file_sertifikat_nkv' && (!prev.sertifikat_nkv || prev.sertifikat_nkv.toLowerCase().includes('belum'))) {
+          next.sertifikat_nkv = 'Ada Sertifikat NKV (Berkas Terlampir)';
+        }
+        if (fieldKey === 'file_izin_usaha' && (!prev.status_ijin_usaha || prev.status_ijin_usaha.trim() === '')) {
+          next.status_ijin_usaha = 'Ada NIB / Izin Usaha (Berkas Terlampir)';
+        }
+        return next;
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveFile = (
+    fieldKey: 'file_sertifikat_halal' | 'file_sertifikat_nkv' | 'file_izin_usaha' | 'file_foto_fasilitas',
+    nameKey: 'file_sertifikat_halal_name' | 'file_sertifikat_nkv_name' | 'file_izin_usaha_name' | 'file_foto_fasilitas_name'
+  ) => {
+    setFormValues((prev) => ({
+      ...prev,
+      [fieldKey]: '',
+      [nameKey]: '',
+    }));
+  };
+
+  const openDocPreview = (title: string, url: string, fileName: string) => {
+    setPreviewDoc({
+      isOpen: true,
+      title,
+      url,
+      fileName,
+    });
+  };
+
+  const closeDocPreview = () => {
+    setPreviewDoc({
+      isOpen: false,
+      title: '',
+      url: '',
+      fileName: '',
+    });
+  };
+
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-
     if (!formValues.nama_tph_r_u || !formValues.nama_tph_r_u.trim()) {
       alert('Nama TPH/RPU wajib diisi.');
       return;
     }
 
     if (editingNo !== null) {
-      // Mode edit: update entri yang sudah ada
       setDataRph((prev) =>
-        prev.map((item) =>
-          item.no === editingNo ? { ...formValues, no: editingNo } : item
-        )
+        prev.map((item) => (item.no === editingNo ? { ...formValues, no: editingNo } : item))
       );
     } else {
-      // Mode tambah: buat nomor baru otomatis
       const nextNo =
-        dataRph.length > 0
-          ? Math.max(...dataRph.map((d) => Number(d.no) || 0)) + 1
-          : 1;
+        dataRph.length > 0 ? Math.max(...dataRph.map((d) => Number(d.no) || 0)) + 1 : 1;
       setDataRph((prev) => [...prev, { ...formValues, no: nextNo }]);
     }
-
     closeModal();
   };
 
-  // ---------- HAPUS DATA ----------
   const handleDelete = (no: number) => {
     setDataRph((prev) => prev.filter((item) => item.no !== no));
     setConfirmDeleteNo(null);
   };
 
-  // ---------- EXPORT EXCEL ----------
   const handleExportExcel = () => {
     const exportData = dataRph.map((item) => ({
       No: item.no,
@@ -1589,334 +1710,878 @@ export default function RphTphTpuPage() {
       'No. Telp': item.no_telp,
       'Status Ijin Usaha': item.status_ijin_usaha,
       'Lokasi RPU/TPH': item.lokasi_rpu,
-      'Lokasi Desa/Kecamatan/Alamat Pemilik':
-        item.lokasi_desa_kecamatan_alamat_pemilik,
+      'Lokasi Desa/Kecamatan/Alamat Pemilik': item.lokasi_desa_kecamatan_alamat_pemilik,
       'Pemotongan per Hari (ekor)': item.pemotongan_per_hari_ekor,
       'Sertifikat Halal': item.sertifikat_halal,
+      'Berkas Halal Terlampir': item.file_sertifikat_halal_name ? 'Ada File' : 'Tidak Ada',
       'Sertifikat NKV': item.sertifikat_nkv,
+      'Berkas NKV Terlampir': item.file_sertifikat_nkv_name ? 'Ada File' : 'Tidak Ada',
+      'Berkas Izin Usaha': item.file_izin_usaha_name ? 'Ada File' : 'Tidak Ada',
+      'Foto Fasilitas': item.file_foto_fasilitas_name ? 'Ada File' : 'Tidak Ada',
       'Rata-rata Produksi per Bulan (kg)': item.rata2_produksi_per_bulan_kg,
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(exportData);
-
-    // Lebar kolom otomatis biar rapi
-    worksheet['!cols'] = Object.keys(exportData[0] || {}).map((key) => ({
-      wch: Math.max(key.length, 18),
-    }));
-
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Data RPH-TPH-TPU');
-
     const today = new Date().toISOString().slice(0, 10);
-    XLSX.writeFile(workbook, `data-rph-tph-tpu-${today}.xlsx`);
+    XLSX.writeFile(workbook, `Data_RPH_TPH_TPU_${today}.xlsx`);
   };
 
+  const countRPU = dataRph.filter((d) => (d.jenis_unit_usaha || '').toUpperCase().includes('RPU')).length;
+  const countTPU = dataRph.filter(
+    (d) =>
+      (d.jenis_unit_usaha || '').toUpperCase().includes('TPU') ||
+      (d.jenis_unit_usaha || '').toUpperCase().includes('TPH')
+  ).length;
+  const countHalal = dataRph.filter(
+    (d) =>
+      (d.sertifikat_halal || '').toLowerCase().includes('sudah') ||
+      (d.sertifikat_halal || '').toLowerCase().includes('ada') ||
+      (d.sertifikat_halal || '').toLowerCase().includes('halal') ||
+      (d.sertifikat_halal || '').toLowerCase().includes('id33')
+  ).length;
+  const countNKV = dataRph.filter(
+    (d) =>
+      (d.sertifikat_nkv || '').toLowerCase().includes('tingkat') ||
+      (d.sertifikat_nkv || '').toLowerCase().includes('rph')
+  ).length;
+
   return (
-    <div className="min-h-screen bg-purple-50 flex flex-col p-4 md:p-6 font-sans text-gray-900">
-      {/* HEADER */}
-      <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 text-center md:text-left">
-        <Link
-          href="/kesmavet"
-          className="w-full md:w-auto text-center bg-purple-700 hover:bg-purple-800 text-white px-5 py-3 md:py-2 rounded-lg font-bold shadow-md transition-colors"
-        >
-          ← Kembali ke Kesmavet
-        </Link>
-        <h1 className="text-2xl md:text-3xl font-black text-purple-900">
-          Data Pelaku Usaha Pemotongan Hewan
-        </h1>
-        <div className="w-full md:w-auto flex flex-col md:flex-row gap-2">
-          <button
-            onClick={openAddModal}
-            className="w-full md:w-auto text-center bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 md:py-2 rounded-lg font-bold shadow-md transition-colors"
-          >
-            ➕ Tambah Data
-          </button>
-          <button
-            onClick={handleExportExcel}
-            className="w-full md:w-auto text-center bg-white border-2 border-purple-600 text-purple-700 hover:bg-purple-50 px-5 py-3 md:py-2 rounded-lg font-bold shadow-md"
-          >
-            📥 Unduh Excel
-          </button>
-        </div>
-      </div>
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-purple-600 selection:text-white pb-20">
+      
+      {/* ── TOP HEADER (Tema Ungu - Lega & Bernapas) ── */}
+      <header className="border-b border-purple-100 bg-white/95 backdrop-blur-md sticky top-0 z-30 shadow-xs">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5 min-h-[80px] sm:min-h-[88px] flex items-center justify-between gap-3">
+          
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <Link
+              href="/kesmavet"
+              className="min-h-touch min-w-touch w-11 h-11 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center transition-all shadow-xs shrink-0"
+              aria-label="Kembali ke Kesmavet"
+            >
+              <ArrowLeft size={18} strokeWidth={2.5} />
+            </Link>
 
-      {/* DASHBOARD STATISTIK */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white p-4 md:p-6 rounded-2xl shadow border-l-8 border-purple-600 flex flex-col justify-center">
-          <p className="text-xs md:text-sm font-bold text-gray-500 uppercase">
-            Total Data
-          </p>
-          <p className="text-3xl md:text-4xl font-black text-purple-800">
-            {dataRph.length}
-          </p>
-        </div>
-        <div className="bg-white p-4 md:p-6 rounded-2xl shadow border-l-8 border-emerald-500 flex flex-col justify-center">
-          <p className="text-xs md:text-sm font-bold text-gray-500 uppercase">
-            Unit RPU
-          </p>
-          <p className="text-3xl md:text-4xl font-black text-emerald-700">
-            {
-              dataRph.filter((d) => (d.jenis_unit_usaha || '').includes('RPU'))
-                .length
-            }
-          </p>
-        </div>
-        <div className="bg-white p-4 md:p-6 rounded-2xl shadow border-l-8 border-blue-500 flex flex-col justify-center">
-          <p className="text-xs md:text-sm font-bold text-gray-500 uppercase">
-            Unit TPU/TPH
-          </p>
-          <p className="text-3xl md:text-4xl font-black text-blue-700">
-            {
-              dataRph.filter(
-                (d) =>
-                  (d.jenis_unit_usaha || '').includes('TPU') ||
-                  (d.jenis_unit_usaha || '').includes('TPH')
-              ).length
-            }
-          </p>
-        </div>
-        <div className="bg-white p-4 md:p-6 rounded-2xl shadow border-l-8 border-amber-500 flex flex-col justify-center">
-          <p className="text-xs md:text-sm font-bold text-gray-500 uppercase">
-            Bersertifikat Halal
-          </p>
-          <p className="text-3xl md:text-4xl font-black text-amber-700">
-            {
-              dataRph.filter(
-                (d) =>
-                  (d.sertifikat_halal || '').toLowerCase().includes('sudah') ||
-                  (d.sertifikat_halal || '').toLowerCase().includes('ada') ||
-                  (d.sertifikat_halal || '').toLowerCase().includes('halal') ||
-                  (d.sertifikat_halal || '').toLowerCase().includes('id33')
-              ).length
-            }
-          </p>
-        </div>
-      </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 mb-0.5">
+                <Link href="/kesmavet" className="text-xs font-semibold text-slate-500 hover:text-purple-700 transition-colors truncate">
+                  Kesmavet
+                </Link>
+                <span className="text-slate-300">/</span>
+                <span className="text-xs font-bold text-purple-700 whitespace-nowrap">RPH &amp; TPU</span>
+              </div>
+              <h1 className="text-base sm:text-xl font-bold text-slate-900 tracking-tight leading-tight truncate">
+                Database Rumah Potong &amp; Tempat Pemotongan Hewan
+              </h1>
+            </div>
+          </div>
 
-      {/* SEARCH BAR & TABEL DATA */}
-      <div className="bg-white p-4 md:p-6 rounded-3xl shadow-xl flex flex-col flex-grow relative">
-        <div className="mb-6 flex flex-col md:flex-row items-center justify-between gap-4">
-          <h2 className="text-xl md:text-2xl font-bold text-purple-900 w-full md:w-auto text-center md:text-left">
-            Daftar RPH, TPH, TPU
-          </h2>
-          <input
-            type="text"
-            placeholder="🔍 Cari nama RPU, pemilik, atau lokasi..."
-            className="w-full md:max-w-md p-3 border-2 border-purple-100 rounded-xl bg-purple-50 focus:outline-none focus:border-purple-500"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={handleExportExcel}
+              title="Export Excel"
+              aria-label="Export Excel"
+              className="min-h-touch min-w-touch h-11 w-11 sm:w-auto sm:px-5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-bold flex items-center justify-center sm:gap-2 transition-colors shadow-xs cursor-pointer"
+            >
+              <Download size={16} strokeWidth={2.5} />
+              <span className="hidden sm:inline">Export Excel</span>
+            </button>
+            <button
+              onClick={openAddModal}
+              title="Tambah Unit"
+              aria-label="Tambah Unit"
+              className="min-h-touch min-w-touch h-11 w-11 sm:w-auto sm:px-5 rounded-xl bg-purple-600 text-white text-xs sm:text-sm font-bold flex items-center justify-center sm:gap-2 hover:bg-purple-700 transition-all shadow-xs cursor-pointer"
+            >
+              <Plus size={16} strokeWidth={2.5} />
+              <span className="hidden sm:inline">Tambah Unit</span>
+            </button>
+          </div>
+
+        </div>
+      </header>
+
+      {/* ── MAIN WORKSPACE ── */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-12 space-y-8">
+        
+        {/* KPI Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="p-5 rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <p className="text-xs font-sans font-semibold uppercase tracking-wider text-slate-500 mb-1">
+              Total Unit Terdata
+            </p>
+            <p className="font-sans text-2xl sm:text-3xl font-bold text-slate-900">
+              {dataRph.length} <span className="text-xs font-normal text-slate-500">Unit</span>
+            </p>
+          </div>
+
+          <div className="p-5 rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <p className="text-xs font-sans font-semibold uppercase tracking-wider text-slate-500 mb-1">
+              Unit RPU & TPU
+            </p>
+            <p className="font-sans text-2xl sm:text-3xl font-bold text-purple-600">
+              {countRPU + countTPU} <span className="text-xs font-normal text-slate-500">Unggas/Hewan</span>
+            </p>
+          </div>
+
+          <div className="p-5 rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <p className="text-xs font-sans font-semibold uppercase tracking-wider text-slate-500 mb-1">
+              Sertifikasi Halal
+            </p>
+            <p className="font-sans text-2xl sm:text-3xl font-bold text-vitality">
+              {countHalal} <span className="text-xs font-normal text-slate-500">Tersertifikasi</span>
+            </p>
+          </div>
+
+          <div className="p-5 rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <p className="text-xs font-sans font-semibold uppercase tracking-wider text-slate-500 mb-1">
+              Memiliki NKV
+            </p>
+            <p className="font-sans text-2xl sm:text-3xl font-bold text-lime">
+              {countNKV} <span className="text-xs font-normal text-slate-500">Unit</span>
+            </p>
+          </div>
         </div>
 
-        {/* --- PERBAIKAN SCROLLBAR DI SINI --- */}
-        {/* Tambahkan max-h-[500px] (atau sesuai selera) dan overflow-y-auto agar tabelnya bisa di-scroll secara mandiri */}
-        <div className="overflow-x-auto overflow-y-auto max-h-[500px] rounded-xl border border-gray-200">
-          <table className="w-full text-sm text-left whitespace-nowrap">
-            {/* Supaya headernya tetap kelihatan saat di-scroll bawah, tambahkan sticky top-0 */}
-            <thead className="bg-purple-100 text-purple-900 font-bold border-b-2 border-purple-200 sticky top-0 z-10 shadow-sm">
-              <tr>
-                <th className="p-3 w-12 text-center">No</th>
-                <th className="p-3">Nama Unit Usaha</th>
-                <th className="p-3">Jenis</th>
-                <th className="p-3">Pemilik</th>
-                <th className="p-3">Kontak / Telp</th>
-                <th className="p-3">Lokasi (Alamat)</th>
-                <th className="p-3 text-center">Kapasitas (Ekor/hr)</th>
-                <th className="p-3 text-center">Status Halal</th>
-                <th className="p-3 text-center">Status NKV</th>
-                <th className="p-3 text-center sticky right-0 bg-purple-100">
-                  Aksi
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-purple-100">
-              {filteredData.length > 0 ? (
-                filteredData.map((item) => (
-                  <tr
-                    key={item.no}
-                    className="border-b hover:bg-purple-50 transition-colors"
-                  >
-                    <td className="p-3 text-center font-bold text-gray-500">
-                      {item.no}
-                    </td>
-                    <td className="p-3 font-bold text-purple-800">
-                      {item.nama_tph_r_u || '-'}
-                    </td>
-                    <td className="p-3">
-                      <span className="bg-gray-200 px-2 py-1 rounded text-xs font-bold">
-                        {item.jenis_unit_usaha || '-'}
-                      </span>
-                    </td>
-                    <td className="p-3">{item.pemilik || '-'}</td>
-                    <td className="p-3">{item.no_telp || '-'}</td>
-                    <td
-                      className="p-3 max-w-xs truncate"
-                      title={
-                        item.lokasi_rpu ||
-                        item.lokasi_desa_kecamatan_alamat_pemilik
-                      }
-                    >
-                      {item.lokasi_rpu ||
-                        item.lokasi_desa_kecamatan_alamat_pemilik ||
-                        '-'}
-                    </td>
-                    <td className="p-3 text-center font-bold text-blue-700">
-                      {item.pemotongan_per_hari_ekor || '-'}
-                    </td>
-                    <td className="p-3 text-center">
-                      {(item.sertifikat_halal || '')
-                        .toLowerCase()
-                        .includes('sudah') ||
-                      (item.sertifikat_halal || '')
-                        .toLowerCase()
-                        .includes('ada') ||
-                      (item.sertifikat_halal || '')
-                        .toLowerCase()
-                        .includes('halal') ||
-                      (item.sertifikat_halal || '')
-                        .toLowerCase()
-                        .includes('id33') ? (
-                        <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold">
-                          ✓ Bersertifikat
-                        </span>
-                      ) : (
-                        <span className="text-gray-400 text-xs">Belum / -</span>
-                      )}
-                    </td>
-                    <td className="p-3 text-center">
-                      {(item.sertifikat_nkv || '')
-                        .toLowerCase()
-                        .includes('tingkat') ||
-                      (item.sertifikat_nkv || '')
-                        .toLowerCase()
-                        .includes('rph') ? (
-                        <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-bold">
-                          {item.sertifikat_nkv}
-                        </span>
-                      ) : (item.sertifikat_nkv || '')
-                          .toLowerCase()
-                          .includes('proses') ? (
-                        <span className="bg-amber-100 text-amber-700 px-2 py-1 rounded text-xs font-bold">
-                          Proses
-                        </span>
-                      ) : (
-                        <span className="text-gray-400 text-xs">Belum</span>
-                      )}
-                    </td>
-                    <td className="p-3 text-center sticky right-0 bg-white shadow-[-10px_0_15px_-10px_rgba(0,0,0,0.1)]">
-                      <div className="flex gap-2 justify-center">
-                        <button
-                          onClick={() => openEditModal(item)}
-                          className="bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
-                        >
-                          ✏️ Edit
-                        </button>
-                        {confirmDeleteNo === item.no ? (
-                          <div className="flex gap-1 items-center">
-                            <button
-                              onClick={() => handleDelete(item.no)}
-                              className="bg-red-600 hover:bg-red-700 text-white px-2 py-1.5 rounded-lg text-xs font-bold"
-                            >
-                              Yakin?
-                            </button>
-                            <button
-                              onClick={() => setConfirmDeleteNo(null)}
-                              className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-2 py-1.5 rounded-lg text-xs font-bold"
-                            >
-                              Batal
-                            </button>
+        {/* Filter Toolbar */}
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            {['Semua', 'RPU', 'TPU', 'TPH', 'RPH'].map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setSelectedKategori(cat)}
+                className={`min-h-touch h-9 px-3.5 rounded-xl text-xs font-bold transition-all border ${
+                  selectedKategori === cat
+                    ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                    : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+
+          <div className="relative w-full sm:w-80">
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Cari nama usaha, pemilik, lokasi..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full min-h-touch h-10 pl-9 pr-4 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-900 focus:outline-none focus:border-purple-500 focus:bg-white"
+            />
+          </div>
+        </div>
+
+        {/* Main Table */}
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+            <table className="w-full text-xs text-left whitespace-nowrap">
+              <thead className="bg-slate-50 text-slate-600 font-semibold uppercase tracking-wider border-b border-slate-200 sticky top-0 z-20 shadow-sm">
+                <tr>
+                  <th className="p-3.5 w-12 text-center">NO</th>
+                  <th className="p-3.5">NAMA UNIT USAHA</th>
+                  <th className="p-3.5">JENIS</th>
+                  <th className="p-3.5">PEMILIK</th>
+                  <th className="p-3.5">KONTAK</th>
+                  <th className="p-3.5">LOKASI USAHA</th>
+                  <th className="p-3.5 text-center font-sans">KAPASITAS (EKOR/HR)</th>
+                  <th className="p-3.5 text-center">STATUS HALAL</th>
+                  <th className="p-3.5 text-center">STATUS NKV</th>
+                  <th className="p-3.5 text-center">DOKUMEN TERLAMPIR</th>
+                  <th className="p-3.5 text-center w-24 sticky right-0 bg-slate-50">AKSI</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-slate-800">
+                {filteredData.length > 0 ? (
+                  filteredData.map((item) => {
+                    const isHalal =
+                      (item.sertifikat_halal || '').toLowerCase().includes('sudah') ||
+                      (item.sertifikat_halal || '').toLowerCase().includes('ada') ||
+                      (item.sertifikat_halal || '').toLowerCase().includes('halal') ||
+                      (item.sertifikat_halal || '').toLowerCase().includes('id33') ||
+                      !!item.file_sertifikat_halal;
+
+                    const isNKV =
+                      (item.sertifikat_nkv || '').toLowerCase().includes('tingkat') ||
+                      (item.sertifikat_nkv || '').toLowerCase().includes('rph') ||
+                      (item.sertifikat_nkv || '').toLowerCase().includes('ada') ||
+                      !!item.file_sertifikat_nkv;
+
+                    return (
+                      <tr key={item.no} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="p-3.5 text-center font-sans font-bold text-slate-600">{item.no}</td>
+                        <td className="p-3.5 font-extrabold text-slate-950 text-sm">{item.nama_tph_r_u || '-'}</td>
+                        <td className="p-3.5">
+                          <span className="px-2.5 py-1 rounded-lg text-xs font-extrabold bg-slate-100 text-slate-800 border border-slate-300">
+                            {item.jenis_unit_usaha || '-'}
+                          </span>
+                        </td>
+                        <td className="p-3.5 font-bold text-slate-900">{item.pemilik || '-'}</td>
+                        <td className="p-3.5 font-sans font-bold text-slate-800">{item.no_telp || '-'}</td>
+                        <td className="p-3.5 font-semibold text-slate-800 max-w-xs truncate" title={item.lokasi_rpu || item.lokasi_desa_kecamatan_alamat_pemilik}>
+                          {item.lokasi_rpu || item.lokasi_desa_kecamatan_alamat_pemilik || '-'}
+                        </td>
+                        <td className="p-3.5 text-center font-sans font-extrabold text-sm text-purple-700">
+                          {item.pemotongan_per_hari_ekor || '-'}
+                        </td>
+                        <td className="p-3.5 text-center">
+                          {isHalal ? (
+                            <span className="px-2.5 py-1 rounded-full text-xs font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                              ✓ Halal
+                            </span>
+                          ) : (
+                            <span className="text-slate-500 font-bold text-xs">Belum</span>
+                          )}
+                        </td>
+                        <td className="p-3.5 text-center">
+                          {isNKV ? (
+                            <span className="px-2.5 py-1 rounded-full text-xs font-extrabold bg-blue-100 text-blue-800 border border-blue-300">
+                              {item.sertifikat_nkv && !item.sertifikat_nkv.toLowerCase().includes('belum') ? item.sertifikat_nkv : 'Ada NKV'}
+                            </span>
+                          ) : (
+                            <span className="text-slate-500 font-bold text-xs">Belum</span>
+                          )}
+                        </td>
+                        <td className="p-3.5 text-center">
+                          <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                            {item.file_sertifikat_halal && (
+                              <button
+                                onClick={() => openDocPreview('Sertifikat Halal', item.file_sertifikat_halal!, item.file_sertifikat_halal_name || 'Sertifikat_Halal.pdf')}
+                                className="px-2 py-1 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 flex items-center gap-1 transition-colors shadow-2xs"
+                                title="Lihat Berkas Halal"
+                              >
+                                <FileCheck size={12} className="text-emerald-600" />
+                                <span>Halal</span>
+                              </button>
+                            )}
+                            {item.file_sertifikat_nkv && (
+                              <button
+                                onClick={() => openDocPreview('Sertifikat NKV', item.file_sertifikat_nkv!, item.file_sertifikat_nkv_name || 'Sertifikat_NKV.pdf')}
+                                className="px-2 py-1 rounded-lg text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 flex items-center gap-1 transition-colors shadow-2xs"
+                                title="Lihat Berkas NKV"
+                              >
+                                <ShieldCheck size={12} className="text-blue-600" />
+                                <span>NKV</span>
+                              </button>
+                            )}
+                            {item.file_izin_usaha && (
+                              <button
+                                onClick={() => openDocPreview('Surat Izin Usaha / NIB', item.file_izin_usaha!, item.file_izin_usaha_name || 'Izin_Usaha.pdf')}
+                                className="px-2 py-1 rounded-lg text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 flex items-center gap-1 transition-colors shadow-2xs"
+                                title="Lihat Berkas Izin Usaha"
+                              >
+                                <FileText size={12} className="text-purple-600" />
+                                <span>Izin</span>
+                              </button>
+                            )}
+                            {item.file_foto_fasilitas && (
+                              <button
+                                onClick={() => openDocPreview('Foto Fasilitas Tempat Pemotongan', item.file_foto_fasilitas!, item.file_foto_fasilitas_name || 'Foto_Fasilitas.jpg')}
+                                className="px-2 py-1 rounded-lg text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 flex items-center gap-1 transition-colors shadow-2xs"
+                                title="Lihat Foto Fasilitas"
+                              >
+                                <ImageIcon size={12} className="text-amber-600" />
+                                <span>Foto</span>
+                              </button>
+                            )}
+                            {!item.file_sertifikat_halal && !item.file_sertifikat_nkv && !item.file_izin_usaha && !item.file_foto_fasilitas && (
+                              <span className="text-slate-400 text-[11px]">-</span>
+                            )}
                           </div>
-                        ) : (
-                          <button
-                            onClick={() => setConfirmDeleteNo(item.no)}
-                            className="bg-red-100 hover:bg-red-200 text-red-700 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
-                          >
-                            🗑️ Hapus
-                          </button>
-                        )}
-                      </div>
+                        </td>
+                        <td className="p-3.5 text-center sticky right-0 bg-white shadow-[-5px_0_10px_rgba(0,0,0,0.03)]">
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              onClick={() => openEditModal(item)}
+                              className="min-h-touch h-7 w-7 rounded-lg border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors"
+                              title="Edit Data"
+                            >
+                              <Edit2 size={12} />
+                            </button>
+                            {confirmDeleteNo === item.no ? (
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => handleDelete(item.no)}
+                                  className="h-7 px-2 rounded-lg bg-red-600 text-white font-bold text-[10px]"
+                                >
+                                  Ya
+                                </button>
+                                <button
+                                  onClick={() => setConfirmDeleteNo(null)}
+                                  className="h-7 px-2 rounded-lg bg-slate-200 text-slate-700 font-bold text-[10px]"
+                                >
+                                  Batal
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => setConfirmDeleteNo(item.no)}
+                                className="min-h-touch h-7 w-7 rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center transition-colors"
+                                title="Hapus Data"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan={11} className="p-12 text-center text-slate-400 font-medium">
+                      Pencarian &quot;{searchTerm}&quot; tidak ditemukan.
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td
-                    colSpan={10}
-                    className="p-8 text-center text-gray-500 font-bold"
-                  >
-                    Pencarian &quot;{searchTerm}&quot; tidak ditemukan.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
 
-      {/* MODAL TAMBAH / EDIT DATA */}
+      </main>
+
+      {/* ── MODAL TAMBAH / EDIT DENGAN UPLOAD FILE LENGKAP ── */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="p-5 border-b flex items-center justify-between sticky top-0 bg-white rounded-t-2xl z-10">
-              <h3 className="text-xl font-black text-purple-900">
-                {editingNo !== null
-                  ? 'Edit Data Unit Usaha'
-                  : 'Tambah Data Unit Usaha Baru'}
-              </h3>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-3xl w-full shadow-2xl space-y-6 max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+              <div>
+                <h3 className="font-bold text-lg text-slate-900">
+                  {editingNo !== null ? 'Edit Unit Usaha Pemotongan' : 'Tambah Unit Usaha Pemotongan Baru'}
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Isi data identitas unit usaha dan lampirkan berkas dokumen persyaratan (PDF / Foto).
+                </p>
+              </div>
               <button
                 onClick={closeModal}
-                className="text-gray-400 hover:text-gray-700 text-2xl leading-none"
+                className="w-9 h-9 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-600 transition-colors"
               >
-                &times;
+                <X size={18} />
               </button>
             </div>
 
-            <form
-              onSubmit={handleSubmit}
-              className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4"
-            >
-              {Object.keys(FIELD_LABELS).map((key) => (
-                <div
-                  key={key}
-                  className={
-                    key === 'lokasi_desa_kecamatan_alamat_pemilik' ||
-                    key === 'lokasi_rpu'
-                      ? 'md:col-span-2'
-                      : ''
-                  }
-                >
-                  <label className="block text-xs font-bold text-gray-600 mb-1">
-                    {FIELD_LABELS[key]}
-                  </label>
-                  <input
-                    type="text"
-                    name={key}
-                    value={(formValues as any)[key] ?? ''}
-                    onChange={handleFieldChange}
-                    className="w-full p-2.5 border-2 border-purple-100 rounded-lg bg-purple-50 focus:outline-none focus:border-purple-500 text-sm"
-                  />
-                </div>
-              ))}
+            <form onSubmit={handleSubmit} className="space-y-6 text-xs">
+              
+              {/* ── SEKSI 1: PROFIL & DATA LAPANGAN ── */}
+              <div className="space-y-4">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-purple-900 flex items-center gap-2">
+                  <Building2 size={15} className="text-purple-600" />
+                  <span>1. Identitas & Profil Unit Usaha</span>
+                </h4>
 
-              <div className="md:col-span-2 flex justify-end gap-3 pt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Nama Unit */}
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+                      Nama TPH/RPU / Unit Usaha *
+                    </label>
+                    <input
+                      type="text"
+                      name="nama_tph_r_u"
+                      value={formValues.nama_tph_r_u ?? ''}
+                      onChange={handleFieldChange}
+                      required
+                      placeholder="Contoh: RPU Pangestu / Kios Daging Sejahtera"
+                      className="w-full min-h-touch h-10 px-3 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:border-purple-500 focus:bg-white outline-none"
+                    />
+                  </div>
+
+                  {/* Jenis Unit Usaha */}
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+                      Jenis Unit Usaha
+                    </label>
+                    <select
+                      name="jenis_unit_usaha"
+                      value={formValues.jenis_unit_usaha ?? 'TPU'}
+                      onChange={handleFieldChange}
+                      className="w-full min-h-touch h-10 px-3 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:border-purple-500 focus:bg-white outline-none"
+                    >
+                      <option value="TPU">TPU (Tempat Pemotongan Unggas)</option>
+                      <option value="TPH">TPH (Tempat Pemotongan Hewan)</option>
+                      <option value="TPH-U">TPH-U (Tempat Penjualan Daging / Unggas)</option>
+                      <option value="RPU">RPU (Rumah Potong Unggas)</option>
+                      <option value="RPH">RPH (Rumah Potong Hewan Ruminansia)</option>
+                    </select>
+                  </div>
+
+                  {/* Pemilik */}
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+                      Nama Pemilik / Pengelola
+                    </label>
+                    <input
+                      type="text"
+                      name="pemilik"
+                      value={formValues.pemilik ?? ''}
+                      onChange={handleFieldChange}
+                      placeholder="Nama pemilik unit usaha"
+                      className="w-full min-h-touch h-10 px-3 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:border-purple-500 focus:bg-white outline-none"
+                    />
+                  </div>
+
+                  {/* Kontak */}
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+                      No. Telp / WhatsApp
+                    </label>
+                    <input
+                      type="text"
+                      name="no_telp"
+                      value={formValues.no_telp ?? ''}
+                      onChange={handleFieldChange}
+                      placeholder="Contoh: 081234567890"
+                      className="w-full min-h-touch h-10 px-3 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:border-purple-500 focus:bg-white outline-none"
+                    />
+                  </div>
+
+                  {/* Lokasi Alamat */}
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+                      Lokasi Desa / Kecamatan / Alamat Lengkap Pemilik
+                    </label>
+                    <input
+                      type="text"
+                      name="lokasi_desa_kecamatan_alamat_pemilik"
+                      value={formValues.lokasi_desa_kecamatan_alamat_pemilik ?? ''}
+                      onChange={handleFieldChange}
+                      placeholder="Contoh: Desa Sidomukti, RT 03 RW 01, Kec. Kuwarasan"
+                      className="w-full min-h-touch h-10 px-3 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:border-purple-500 focus:bg-white outline-none"
+                    />
+                  </div>
+
+                  {/* Lokasi RPU */}
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+                      Lokasi Spesifik RPU / TPH (Jika Berbeda)
+                    </label>
+                    <input
+                      type="text"
+                      name="lokasi_rpu"
+                      value={formValues.lokasi_rpu ?? ''}
+                      onChange={handleFieldChange}
+                      placeholder="Contoh: Pasar Karanganyar / Kompleks RPH Pejagoan"
+                      className="w-full min-h-touch h-10 px-3 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:border-purple-500 focus:bg-white outline-none"
+                    />
+                  </div>
+
+                  {/* Kapasitas Potong */}
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+                      Kapasitas Potong per Hari (ekor)
+                    </label>
+                    <input
+                      type="text"
+                      name="pemotongan_per_hari_ekor"
+                      value={formValues.pemotongan_per_hari_ekor ?? ''}
+                      onChange={handleFieldChange}
+                      placeholder="Contoh: 50 / 200"
+                      className="w-full min-h-touch h-10 px-3 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:border-purple-500 focus:bg-white outline-none"
+                    />
+                  </div>
+
+                  {/* Rata-rata Produksi */}
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+                      Rata-rata Produksi per Bulan (kg)
+                    </label>
+                    <input
+                      type="text"
+                      name="rata2_produksi_per_bulan_kg"
+                      value={formValues.rata2_produksi_per_bulan_kg ?? ''}
+                      onChange={handleFieldChange}
+                      placeholder="Contoh: 1500"
+                      className="w-full min-h-touch h-10 px-3 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:border-purple-500 focus:bg-white outline-none"
+                    />
+                  </div>
+
+                  {/* Status Izin */}
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+                      Status Ijin Usaha / Legalitas
+                    </label>
+                    <input
+                      type="text"
+                      name="status_ijin_usaha"
+                      value={formValues.status_ijin_usaha ?? ''}
+                      onChange={handleFieldChange}
+                      placeholder="Contoh: NIB Terbit / Dalam Proses"
+                      className="w-full min-h-touch h-10 px-3 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:border-purple-500 focus:bg-white outline-none"
+                    />
+                  </div>
+
+                  {/* Keterangan Halal */}
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+                      Keterangan Sertifikat Halal
+                    </label>
+                    <input
+                      type="text"
+                      name="sertifikat_halal"
+                      value={formValues.sertifikat_halal ?? ''}
+                      onChange={handleFieldChange}
+                      placeholder="Contoh: ID3311000... / Sudah Halal"
+                      className="w-full min-h-touch h-10 px-3 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:border-purple-500 focus:bg-white outline-none"
+                    />
+                  </div>
+
+                  {/* Keterangan NKV */}
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+                      Keterangan Sertifikat NKV
+                    </label>
+                    <input
+                      type="text"
+                      name="sertifikat_nkv"
+                      value={formValues.sertifikat_nkv ?? ''}
+                      onChange={handleFieldChange}
+                      placeholder="Contoh: NKV Tingkat 2 / RPH-3305... / Belum"
+                      className="w-full min-h-touch h-10 px-3 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:border-purple-500 focus:bg-white outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* ── SEKSI 2: UPLOAD BERKAS DOKUMEN PERSYARATAN ── */}
+              <div className="space-y-4 pt-4 border-t border-slate-200">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-purple-900 flex items-center gap-2">
+                    <Paperclip size={15} className="text-purple-600" />
+                    <span>2. Dokumen Persyaratan & Berkas Legalitas (Upload File PDF / Foto)</span>
+                  </h4>
+                  <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">Maks 15 MB per file</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  
+                  {/* UPLOAD 1: SERTIFIKAT HALAL */}
+                  <div className="p-4 rounded-2xl border border-emerald-200 bg-emerald-50/40 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                          <FileCheck size={15} />
+                        </div>
+                        <span className="font-bold text-slate-900 text-xs">Sertifikat Halal (BPJPH/MUI)</span>
+                      </div>
+                      {formValues.file_sertifikat_halal && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-600 text-white">
+                          Terlampir
+                        </span>
+                      )}
+                    </div>
+
+                    {formValues.file_sertifikat_halal ? (
+                      <div className="p-2.5 rounded-xl bg-white border border-emerald-200 flex items-center justify-between gap-2 shadow-2xs">
+                        <div className="min-w-0 flex items-center gap-2">
+                          <FileText size={16} className="text-emerald-600 shrink-0" />
+                          <span className="text-xs text-slate-800 font-semibold truncate">
+                            {formValues.file_sertifikat_halal_name || 'Berkas_Halal.pdf'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => openDocPreview('Sertifikat Halal', formValues.file_sertifikat_halal!, formValues.file_sertifikat_halal_name || 'Berkas_Halal.pdf')}
+                            className="h-7 px-2 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-[11px] font-bold flex items-center gap-1 transition-colors"
+                          >
+                            <Eye size={12} />
+                            <span>Lihat</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveFile('file_sertifikat_halal', 'file_sertifikat_halal_name')}
+                            className="h-7 w-7 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center transition-colors"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <label className="flex flex-col items-center justify-center p-3 rounded-xl border-2 border-dashed border-emerald-300 bg-white hover:bg-emerald-50/60 cursor-pointer transition-colors text-center">
+                        <UploadCloud size={20} className="text-emerald-600 mb-1" />
+                        <span className="text-xs font-bold text-emerald-800">Pilih File Sertifikat Halal</span>
+                        <span className="text-[10px] text-slate-400 mt-0.5">Format PDF atau Foto Scan (Maks 15MB)</span>
+                        <input
+                          type="file"
+                          accept=".pdf,image/*"
+                          onChange={(e) => handleFileUpload(e, 'file_sertifikat_halal', 'file_sertifikat_halal_name')}
+                          className="hidden"
+                        />
+                      </label>
+                    )}
+                  </div>
+
+                  {/* UPLOAD 2: SERTIFIKAT NKV */}
+                  <div className="p-4 rounded-2xl border border-blue-200 bg-blue-50/40 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
+                          <ShieldCheck size={15} />
+                        </div>
+                        <span className="font-bold text-slate-900 text-xs">Sertifikat NKV Resmi</span>
+                      </div>
+                      {formValues.file_sertifikat_nkv && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-600 text-white">
+                          Terlampir
+                        </span>
+                      )}
+                    </div>
+
+                    {formValues.file_sertifikat_nkv ? (
+                      <div className="p-2.5 rounded-xl bg-white border border-blue-200 flex items-center justify-between gap-2 shadow-2xs">
+                        <div className="min-w-0 flex items-center gap-2">
+                          <FileText size={16} className="text-blue-600 shrink-0" />
+                          <span className="text-xs text-slate-800 font-semibold truncate">
+                            {formValues.file_sertifikat_nkv_name || 'Berkas_NKV.pdf'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => openDocPreview('Sertifikat NKV', formValues.file_sertifikat_nkv!, formValues.file_sertifikat_nkv_name || 'Berkas_NKV.pdf')}
+                            className="h-7 px-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 text-[11px] font-bold flex items-center gap-1 transition-colors"
+                          >
+                            <Eye size={12} />
+                            <span>Lihat</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveFile('file_sertifikat_nkv', 'file_sertifikat_nkv_name')}
+                            className="h-7 w-7 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center transition-colors"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <label className="flex flex-col items-center justify-center p-3 rounded-xl border-2 border-dashed border-blue-300 bg-white hover:bg-blue-50/60 cursor-pointer transition-colors text-center">
+                        <UploadCloud size={20} className="text-blue-600 mb-1" />
+                        <span className="text-xs font-bold text-blue-800">Pilih File Sertifikat NKV</span>
+                        <span className="text-[10px] text-slate-400 mt-0.5">Format PDF atau Foto Scan (Maks 15MB)</span>
+                        <input
+                          type="file"
+                          accept=".pdf,image/*"
+                          onChange={(e) => handleFileUpload(e, 'file_sertifikat_nkv', 'file_sertifikat_nkv_name')}
+                          className="hidden"
+                        />
+                      </label>
+                    )}
+                  </div>
+
+                  {/* UPLOAD 3: SURAT IZIN USAHA / NIB */}
+                  <div className="p-4 rounded-2xl border border-purple-200 bg-purple-50/40 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center">
+                          <FileText size={15} />
+                        </div>
+                        <span className="font-bold text-slate-900 text-xs">Surat Izin Usaha / NIB</span>
+                      </div>
+                      {formValues.file_izin_usaha && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-600 text-white">
+                          Terlampir
+                        </span>
+                      )}
+                    </div>
+
+                    {formValues.file_izin_usaha ? (
+                      <div className="p-2.5 rounded-xl bg-white border border-purple-200 flex items-center justify-between gap-2 shadow-2xs">
+                        <div className="min-w-0 flex items-center gap-2">
+                          <FileText size={16} className="text-purple-600 shrink-0" />
+                          <span className="text-xs text-slate-800 font-semibold truncate">
+                            {formValues.file_izin_usaha_name || 'Izin_Usaha.pdf'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => openDocPreview('Surat Izin Usaha / NIB', formValues.file_izin_usaha!, formValues.file_izin_usaha_name || 'Izin_Usaha.pdf')}
+                            className="h-7 px-2 rounded-lg bg-purple-50 text-purple-700 hover:bg-purple-100 text-[11px] font-bold flex items-center gap-1 transition-colors"
+                          >
+                            <Eye size={12} />
+                            <span>Lihat</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveFile('file_izin_usaha', 'file_izin_usaha_name')}
+                            className="h-7 w-7 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center transition-colors"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <label className="flex flex-col items-center justify-center p-3 rounded-xl border-2 border-dashed border-purple-300 bg-white hover:bg-purple-50/60 cursor-pointer transition-colors text-center">
+                        <UploadCloud size={20} className="text-purple-600 mb-1" />
+                        <span className="text-xs font-bold text-purple-800">Pilih File Izin Usaha / NIB</span>
+                        <span className="text-[10px] text-slate-400 mt-0.5">Format PDF atau Foto Scan (Maks 15MB)</span>
+                        <input
+                          type="file"
+                          accept=".pdf,image/*"
+                          onChange={(e) => handleFileUpload(e, 'file_izin_usaha', 'file_izin_usaha_name')}
+                          className="hidden"
+                        />
+                      </label>
+                    )}
+                  </div>
+
+                  {/* UPLOAD 4: FOTO FASILITAS / TEMPAT PEMOTONGAN */}
+                  <div className="p-4 rounded-2xl border border-amber-200 bg-amber-50/40 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center">
+                          <ImageIcon size={15} />
+                        </div>
+                        <span className="font-bold text-slate-900 text-xs">Foto Fasilitas Tempat Potong</span>
+                      </div>
+                      {formValues.file_foto_fasilitas && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-600 text-white">
+                          Terlampir
+                        </span>
+                      )}
+                    </div>
+
+                    {formValues.file_foto_fasilitas ? (
+                      <div className="p-2.5 rounded-xl bg-white border border-amber-200 flex items-center justify-between gap-2 shadow-2xs">
+                        <div className="min-w-0 flex items-center gap-2">
+                          <img
+                            src={formValues.file_foto_fasilitas}
+                            alt="Preview Fasilitas"
+                            className="w-8 h-8 rounded-lg object-cover border border-slate-200 shrink-0"
+                          />
+                          <span className="text-xs text-slate-800 font-semibold truncate">
+                            {formValues.file_foto_fasilitas_name || 'Foto_Fasilitas.jpg'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => openDocPreview('Foto Fasilitas Pemotongan', formValues.file_foto_fasilitas!, formValues.file_foto_fasilitas_name || 'Foto_Fasilitas.jpg')}
+                            className="h-7 px-2 rounded-lg bg-amber-50 text-amber-800 hover:bg-amber-100 text-[11px] font-bold flex items-center gap-1 transition-colors"
+                          >
+                            <Eye size={12} />
+                            <span>Lihat</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveFile('file_foto_fasilitas', 'file_foto_fasilitas_name')}
+                            className="h-7 w-7 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center transition-colors"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <label className="flex flex-col items-center justify-center p-3 rounded-xl border-2 border-dashed border-amber-300 bg-white hover:bg-amber-50/60 cursor-pointer transition-colors text-center">
+                        <UploadCloud size={20} className="text-amber-600 mb-1" />
+                        <span className="text-xs font-bold text-amber-800">Pilih Foto Dokumentasi Lapangan</span>
+                        <span className="text-[10px] text-slate-400 mt-0.5">Format Gambar JPG / PNG / WebP (Maks 15MB)</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleFileUpload(e, 'file_foto_fasilitas', 'file_foto_fasilitas_name')}
+                          className="hidden"
+                        />
+                      </label>
+                    )}
+                  </div>
+
+                </div>
+              </div>
+
+              {/* ── TOMBOL AKSI MODAL ── */}
+              <div className="pt-4 border-t border-slate-200 flex items-center justify-end gap-3">
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="px-5 py-2.5 rounded-lg font-bold text-gray-600 bg-gray-100 hover:bg-gray-200"
+                  className="min-h-touch h-11 px-5 rounded-xl border border-slate-200 bg-slate-100 hover:bg-slate-200 text-xs sm:text-sm font-bold text-slate-700 transition-colors cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-lg font-bold text-white bg-purple-700 hover:bg-purple-800 shadow"
+                  className="min-h-touch h-11 px-6 rounded-xl bg-purple-600 hover:bg-purple-700 active:scale-95 text-white text-xs sm:text-sm font-bold shadow-xs transition-all cursor-pointer"
                 >
-                  {editingNo !== null ? 'Simpan Perubahan' : 'Tambah Data'}
+                  {editingNo !== null ? 'Simpan Perubahan' : 'Simpan Data Unit Usaha'}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+
+      {/* ── MODAL PRATINJAU DOKUMEN / PDF / FOTO ── */}
+      {previewDoc.isOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-3xl w-full shadow-2xl space-y-4 max-h-[92vh] flex flex-col">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 border border-purple-200 flex items-center justify-center">
+                  <FileText size={18} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-slate-900 leading-tight">
+                    {previewDoc.title}
+                  </h3>
+                  <p className="text-xs text-slate-500 truncate max-w-md">
+                    {previewDoc.fileName}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={closeDocPreview}
+                className="w-9 h-9 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-600 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="flex-1 min-h-[380px] max-h-[520px] bg-slate-50 rounded-2xl border border-slate-200 p-2 overflow-hidden flex items-center justify-center">
+              {previewDoc.url.startsWith('data:application/pdf') || previewDoc.fileName.toLowerCase().endsWith('.pdf') ? (
+                <iframe
+                  src={previewDoc.url}
+                  className="w-full h-full min-h-[460px] rounded-xl border border-slate-200 bg-white"
+                  title={previewDoc.title}
+                />
+              ) : (
+                <img
+                  src={previewDoc.url}
+                  alt={previewDoc.title}
+                  className="max-w-full max-h-[480px] object-contain rounded-xl shadow-xs"
+                />
+              )}
+            </div>
+
+            <div className="pt-3 border-t border-slate-200 flex items-center justify-between gap-3">
+              <span className="text-xs text-slate-500">
+                Dokumen Tersimpan di Database Unit Usaha Kesmavet
+              </span>
+              <div className="flex items-center gap-2">
+                <a
+                  href={previewDoc.url}
+                  download={previewDoc.fileName || 'dokumen_pemotongan.pdf'}
+                  className="min-h-touch h-10 px-4 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center gap-1.5 transition-colors shadow-xs"
+                >
+                  <Download size={14} />
+                  <span>Unduh File</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={closeDocPreview}
+                  className="min-h-touch h-10 px-4 rounded-xl border border-slate-200 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors"
+                >
+                  Tutup
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
+

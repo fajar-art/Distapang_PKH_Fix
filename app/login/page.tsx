@@ -3,17 +3,19 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { supabase } from '../../supabase';
+import { supabase } from '@/lib/supabase';
 import {
   Eye,
   EyeOff,
   Mail,
   Lock,
   ShieldCheck,
-  Zap,
-  Layers,
   ArrowRight,
+  ArrowLeft,
   Loader2,
+  AlertCircle,
+  Landmark,
+  CheckCircle2,
 } from 'lucide-react';
 
 export default function LoginPage() {
@@ -37,192 +39,170 @@ export default function LoginPage() {
     setLoading(false);
 
     if (error) {
-      setErrorMsg('Login gagal. Periksa kembali email dan kata sandi Anda.');
+      setErrorMsg('Login gagal. Periksa kembali ID Petugas atau kata sandi Anda.');
     } else {
-      router.push('/');
+      router.push('/beranda');
     }
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#0a0118] flex flex-col items-center justify-center px-6 py-16">
-      {/* ambient blob orbs — consistent with SiMantap glassmorphism baseline */}
-      <div className="pointer-events-none absolute -top-40 left-1/4 h-96 w-96 rounded-full bg-violet-600/25 blur-3xl" />
-      <div className="pointer-events-none absolute top-1/3 -right-32 h-96 w-96 rounded-full bg-fuchsia-500/15 blur-3xl" />
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col justify-between selection:bg-blue-600 selection:text-white">
+      
+      {/* Top Bar Navigation (Lega) */}
+      <header className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 flex items-center justify-between">
+        <Link
+          href="/"
+          className="min-h-touch h-11 px-4 sm:px-5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 text-xs sm:text-sm font-bold flex items-center gap-2 transition-colors shadow-xs"
+        >
+          <ArrowLeft size={16} />
+          <span>Kembali ke Portal Publik</span>
+        </Link>
+      </header>
 
-      {/* radial spotlight glow behind the card, matches reference */}
-      <div
-        className="pointer-events-none absolute left-1/2 top-[8%] h-[36rem] w-[46rem] -translate-x-1/2 rounded-full"
-        style={{
-          background:
-            'radial-gradient(ellipse at center, rgba(168,85,247,0.35) 0%, rgba(124,58,237,0.15) 40%, transparent 70%)',
-        }}
-      />
+      {/* Main Login Card Area */}
+      <main className="w-full max-w-md mx-auto px-4 py-6 sm:py-10">
+        
+        {/* Brand & Identity */}
+        <div className="text-center mb-8 space-y-2">
+          <div className="w-14 h-14 rounded-2xl bg-white border border-slate-200 p-2 mx-auto flex items-center justify-center shadow-xs">
+            <img
+              src="/logo-simantap.png"
+              alt="Logo SiMantap"
+              className="w-full h-full object-contain"
+              onError={(e: any) => {
+                e.currentTarget.style.display = 'none';
+                e.currentTarget.nextSibling.style.display = 'flex';
+              }}
+            />
+            <div className="hidden text-blue-600 items-center justify-center">
+              <Landmark size={24} />
+            </div>
+          </div>
 
-      {/* back link */}
-      <Link
-        href="/"
-        className="absolute left-6 top-6 z-20 flex items-center gap-1 text-sm text-white/50 transition-colors hover:text-white"
-      >
-        ← Kembali
-      </Link>
-
-      <div className="relative z-10 flex w-full flex-col items-center">
-        {/* eyebrow badge */}
-        <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 backdrop-blur-sm">
-          <span className="text-xs text-white/60">
-            Portal Internal SiMantap
-          </span>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+            Masuk SiMantap
+          </h1>
+          <p className="text-sm text-slate-600 leading-relaxed max-w-xs mx-auto">
+            Sistem Informasi Peternakan & Kesehatan Hewan Dinas Pertanian dan Pangan Kebumen
+          </p>
         </div>
 
-        {/* headline, same treatment as reference hero */}
-        <h1
-          className="mb-3 max-w-lg px-4 text-center text-4xl md:text-5xl font-medium leading-tight"
-          style={{
-            background:
-              'linear-gradient(to bottom, #ffffff, #ffffff, rgba(255,255,255,0.6))',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
-            letterSpacing: '-0.03em',
-          }}
-        >
-          Masuk ke SiMantap
-        </h1>
-        <p className="mb-10 max-w-md px-4 text-center text-sm text-white/50">
-          Sistem Informasi Manajemen Ternak Terpadu — Dinas Pertanian dan
-          Pangan Kabupaten Kebumen
-        </p>
-
-        {/* glass login card */}
-        <form
-          onSubmit={handleLogin}
-          className="w-full max-w-md rounded-3xl border border-white/10 bg-white/5 p-8 md:p-9 shadow-2xl backdrop-blur-xl"
-        >
-          <div className="mb-6 flex justify-center">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/ChatGPT_Image_29_Jun_2026,_19.58.30.png"
-              alt="Logo SiMantap"
-              className="h-16 w-16 rounded-full border-2 border-white/20 object-cover shadow-md"
-            />
+        {/* Form Box */}
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm space-y-6">
+          
+          <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+              <ShieldCheck size={20} />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-900">
+                Autentikasi Petugas Dinas
+              </h2>
+              <p className="text-xs text-slate-500">
+                Akses aman terenkripsi untuk petugas terdaftar
+              </p>
+            </div>
           </div>
 
           {errorMsg && (
-            <div className="mb-5 rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-              {errorMsg}
+            <div className="p-3.5 rounded-xl border border-red-200 bg-red-50 text-red-700 text-xs sm:text-sm font-medium flex items-center gap-2.5 animate-in fade-in">
+              <AlertCircle size={18} className="shrink-0 text-red-600" />
+              <span>{errorMsg}</span>
             </div>
           )}
 
-          <div>
-            <label
-              htmlFor="email"
-              className="mb-1.5 block text-xs font-medium text-white/50"
-            >
-              ID Petugas (Email)
-            </label>
-            <div className="relative">
-              <Mail
-                size={18}
-                className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/30"
-              />
-              <input
-                id="email"
-                type="email"
-                placeholder="admin@pkh.com"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-white/5 py-3.5 pl-11 pr-4 text-sm text-white placeholder-white/30 outline-none transition-colors focus:border-violet-400/60"
-              />
+          <form onSubmit={handleLogin} className="space-y-4">
+            
+            {/* Field Email */}
+            <div>
+              <label
+                htmlFor="email"
+                className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700"
+              >
+                ID Petugas
+              </label>
+              <div className="relative">
+                <Mail
+                  size={18}
+                  className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+                <input
+                  id="email"
+                  type="email"
+                  placeholder="petugas@pkh.kebumenkab.go.id"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full min-h-touch-lg h-12 rounded-xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-4 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-blue-600 focus:bg-white transition-colors"
+                />
+              </div>
             </div>
-          </div>
 
-          <div className="mt-4">
-            <div className="mb-1.5 flex items-center justify-between">
+            {/* Field Password */}
+            <div>
               <label
                 htmlFor="password"
-                className="block text-xs font-medium text-white/50"
+                className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700"
               >
                 Kata Sandi
               </label>
-              <Link
-                href="/lupa-sandi"
-                className="text-xs font-medium text-violet-300 hover:text-white transition-colors"
-              >
-                Lupa kata sandi?
-              </Link>
+              <div className="relative">
+                <Lock
+                  size={18}
+                  className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="••••••••••••"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full min-h-touch-lg h-12 rounded-xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-12 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-blue-600 focus:bg-white transition-colors"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
+                  className="min-h-touch min-w-touch w-11 h-11 absolute right-1 top-1/2 -translate-y-1/2 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
-            <div className="relative">
-              <Lock
-                size={18}
-                className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/30"
-              />
-              <input
-                id="password"
-                type={showPassword ? 'text' : 'password'}
-                placeholder="••••••••••"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-white/5 py-3.5 pl-11 pr-11 text-sm text-white placeholder-white/30 outline-none transition-colors focus:border-violet-400/60"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                aria-label={
-                  showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'
-                }
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 transition-colors hover:text-white"
-              >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full min-h-touch-lg h-12 rounded-xl bg-blue-600 text-white font-bold text-sm flex items-center justify-center gap-2 mt-6 shadow-xs hover:bg-blue-700 active:scale-[0.98] disabled:opacity-50 transition-all cursor-pointer"
+            >
+              {loading ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  <span>Memverifikasi Akun...</span>
+                </>
+              ) : (
+                <>
+                  <span>Masuk ke Dashboard Petugas</span>
+                  <ArrowRight size={16} />
+                </>
+              )}
+            </button>
+          </form>
+
+          <div className="pt-4 border-t border-slate-100 text-center text-xs text-slate-500 leading-relaxed">
+            Butuh bantuan akses atau lupa kata sandi? Hubungi Administrator Teknis Bidang PKH Distapang Kebumen.
           </div>
+        </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="mt-7 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-white via-white/95 to-white/70 py-4 font-bold text-[#4c1d95] transition-transform hover:scale-[1.02] active:scale-95 disabled:opacity-60"
-          >
-            {loading ? (
-              <>
-                <Loader2 size={18} className="animate-spin" />
-                Memproses...
-              </>
-            ) : (
-              <>
-                Masuk Sekarang
-                <ArrowRight size={18} />
-              </>
-            )}
-          </button>
+      </main>
 
-          <div className="mt-7 grid grid-cols-3 gap-2">
-            <div className="flex flex-col items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 py-3">
-              <ShieldCheck size={16} className="text-violet-300" />
-              <span className="text-center text-[10px] font-medium text-white/50 leading-tight">
-                Aman &amp; Terenkripsi
-              </span>
-            </div>
-            <div className="flex flex-col items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 py-3">
-              <Zap size={16} className="text-violet-300" />
-              <span className="text-center text-[10px] font-medium text-white/50 leading-tight">
-                Data Real-time
-              </span>
-            </div>
-            <div className="flex flex-col items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 py-3">
-              <Layers size={16} className="text-violet-300" />
-              <span className="text-center text-[10px] font-medium text-white/50 leading-tight">
-                3 Modul Terpadu
-              </span>
-            </div>
-          </div>
-        </form>
+      {/* Footer */}
+      <footer className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 text-center text-xs text-slate-500">
+        &copy; {new Date().getFullYear()} Pemerintah Kabupaten Kebumen. Seluruh Hak Cipta Dilindungi.
+      </footer>
 
-        <p className="mt-6 text-center text-[11px] text-white/30">
-          Butuh bantuan akses? Hubungi admin bidang PKH
-        </p>
-      </div>
     </div>
   );
 }

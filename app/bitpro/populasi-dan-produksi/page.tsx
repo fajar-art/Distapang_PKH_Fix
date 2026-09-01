@@ -1,156 +1,319 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import {
+  ArrowLeft,
+  ChevronRight,
+  BarChart3,
+  TrendingUp,
+  Plus,
+} from 'lucide-react';
 
-/* ─────────────────────────────────────────────
-   KOMPONEN TOMBOL 3D (REUSABLE)
-───────────────────────────────────────────── */
-function YearCard({
-  href,
-  title,
-  theme,
-}: {
-  href: string;
-  title: string;
-  theme: 'emerald' | 'blue';
-}) {
-  const cardRef = useRef<HTMLAnchorElement>(null);
-  const [tilt, setTilt] = useState({ x: 0, y: 0 });
-  const [hovered, setHovered] = useState(false);
+export default function PopulasiDanProduksiPage() {
+  const router = useRouter();
+  const [extraYears, setExtraYears] = useState<number[]>([2027]);
+  const [showYearModal, setShowYearModal] = useState<boolean>(false);
+  const [targetType, setTargetType] = useState<'populasi' | 'produksi'>('populasi');
+  const [inputYear, setInputYear] = useState<string>('2028');
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    const card = cardRef.current;
-    if (!card) return;
-    const rect = card.getBoundingClientRect();
-    const dx = (e.clientX - (rect.left + rect.width / 2)) / (rect.width / 2);
-    const dy = (e.clientY - (rect.top + rect.height / 2)) / (rect.height / 2);
-    setTilt({ x: -dy * 15, y: dx * 15 });
+  useEffect(() => {
+    const saved = localStorage.getItem('distapang_extra_years');
+    if (saved) {
+      try {
+        setExtraYears(JSON.parse(saved));
+      } catch {
+        setExtraYears([2027]);
+      }
+    }
+  }, []);
+
+  const handleOpenYear = (yearNum: number, type: 'populasi' | 'produksi') => {
+    if (!yearNum || yearNum < 2000 || yearNum > 2100) {
+      alert('Masukkan tahun yang valid (2000 - 2100)!');
+      return;
+    }
+
+    if (!extraYears.includes(yearNum) && yearNum !== 2025 && yearNum !== 2026) {
+      const updated = [...extraYears, yearNum].sort((a, b) => a - b);
+      setExtraYears(updated);
+      localStorage.setItem('distapang_extra_years', JSON.stringify(updated));
+    }
+
+    setShowYearModal(false);
+
+    if (type === 'populasi') {
+      if (yearNum === 2025) router.push('/bitpro/populasi-dan-produksi/2025');
+      else if (yearNum === 2026) router.push('/bitpro/populasi-dan-produksi/2026');
+      else router.push(`/bitpro/populasi-dan-produksi/2026?year=${yearNum}`);
+    } else {
+      if (yearNum === 2025) router.push('/bitpro/populasi-dan-produksi/produksi-2025');
+      else if (yearNum === 2026) router.push('/bitpro/populasi-dan-produksi/produksi-2026');
+      else router.push(`/bitpro/populasi-dan-produksi/produksi-2026?year=${yearNum}`);
+    }
   };
 
-  const themeClasses =
-    theme === 'emerald'
-      ? 'bg-emerald-800/40 border-emerald-500/30 hover:bg-emerald-600/60 hover:border-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.15)] hover:shadow-[0_0_30px_rgba(16,185,129,0.4)]'
-      : 'bg-blue-900/40 border-blue-500/30 hover:bg-blue-600/60 hover:border-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.15)] hover:shadow-[0_0_30px_rgba(59,130,246,0.4)]';
-
   return (
-    <Link
-      ref={cardRef}
-      href={href}
-      onMouseMove={handleMouseMove}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => {
-        setTilt({ x: 0, y: 0 });
-        setHovered(false);
-      }}
-      style={{
-        transform: hovered
-          ? `perspective(1000px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) translateY(-5px) scale(1.03)`
-          : 'perspective(1000px) rotateX(0deg) rotateY(0deg) translateY(0) scale(1)',
-        transition: hovered
-          ? 'transform 0.1s ease-out'
-          : 'transform 0.5s cubic-bezier(0.23,1,0.32,1)',
-      }}
-      className={`relative group flex items-center justify-center p-6 rounded-2xl font-black text-xl text-white backdrop-blur-md border ${themeClasses}`}
-    >
-      <span className="drop-shadow-md">{title}</span>
-    </Link>
-  );
-}
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-emerald-600 selection:text-white pb-20">
+      
+      {/* ── TOP HEADER ── */}
+      <header className="border-b border-emerald-100 bg-white/95 backdrop-blur-md sticky top-0 z-30 shadow-xs">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5 min-h-[80px] sm:min-h-[88px] flex items-center justify-between gap-3">
+          
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <Link
+              href="/bitpro"
+              className="min-h-touch min-w-touch w-11 h-11 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center transition-all shadow-xs shrink-0"
+              aria-label="Kembali ke Bitpro"
+            >
+              <ArrowLeft size={18} strokeWidth={2.5} />
+            </Link>
 
-/* ─────────────────────────────────────────────
-   HALAMAN UTAMA POPULASI & PRODUKSI
-───────────────────────────────────────────── */
-export default function PopulasiDanProduksi() {
-  return (
-    <div className="relative min-h-screen flex flex-col items-center pt-10 px-6 pb-16 font-sans text-gray-100 overflow-hidden bg-gradient-to-br from-[#022c22] via-[#064e3b] to-[#022c22]">
-      {/* LATAR BELAKANG ESTETIK (Orbs) */}
-      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
-        <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-[120px] animate-pulse" />
-        <div
-          className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[120px] animate-pulse"
-          style={{ animationDelay: '2s' }}
-        />
-      </div>
-
-      {/* NAVIGASI ATAS */}
-      <div className="relative z-10 w-full max-w-4xl flex justify-start mb-12">
-        <Link
-          href="/bitpro"
-          className="bg-emerald-900/60 hover:bg-emerald-800 backdrop-blur-md px-6 py-2.5 rounded-full font-bold transition-all border border-emerald-500/30 shadow-md text-white flex items-center gap-2"
-        >
-          ← Kembali ke Modul Bitpro
-        </Link>
-      </div>
-
-      <div className="relative z-10 text-center mb-12">
-        <h1 className="text-4xl md:text-5xl font-black text-white drop-shadow-xl tracking-tight">
-          Pilih Kategori & Tahun Data
-        </h1>
-        <p className="text-emerald-200/70 mt-3 font-medium">
-          Sistem Rekapitulasi Populasi dan Produksi Peternakan
-        </p>
-      </div>
-
-      <div className="relative z-10 w-full max-w-4xl flex flex-col gap-10">
-        {/* =========================================
-            BAGIAN ATAS: POPULASI TERNAK
-        ========================================= */}
-        <div className="bg-[#0b1c17]/60 backdrop-blur-xl p-8 md:p-10 rounded-[2rem] shadow-2xl border border-emerald-500/20 relative overflow-hidden group">
-          <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-emerald-600 via-emerald-400 to-emerald-600" />
-
-          <div className="text-center mb-8">
-            <span className="text-5xl block mb-4 drop-shadow-lg group-hover:scale-110 transition-transform">
-              🐄
-            </span>
-            <h2 className="text-2xl font-black text-white uppercase tracking-widest drop-shadow-md">
-              Populasi Ternak
-            </h2>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 mb-0.5">
+                <Link href="/bitpro" className="text-xs font-semibold text-slate-500 hover:text-emerald-700 transition-colors truncate">
+                  Bitpro
+                </Link>
+                <span className="text-slate-300">/</span>
+                <span className="text-xs font-bold text-emerald-700 whitespace-nowrap">Populasi &amp; Produksi</span>
+              </div>
+              <h1 className="text-base sm:text-xl font-bold text-slate-900 tracking-tight leading-tight truncate">
+                Statistik Populasi dan Produksi Peternakan
+              </h1>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <YearCard
-              href="/bitpro/populasi-dan-produksi/2025"
-              title="DATA POPULASI 2025"
-              theme="emerald"
-            />
-            <YearCard
-              href="/bitpro/populasi-dan-produksi/2026"
-              title="DATA POPULASI 2026"
-              theme="emerald"
-            />
-          </div>
+        </div>
+      </header>
+
+      {/* ── MAIN WORKSPACE ── */}
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-12 space-y-8">
+        
+        {/* Intro */}
+        <div className="text-center max-w-2xl mx-auto space-y-2">
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+            Pilih Kategori &amp; Periode Laporan
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-600">
+            Akses lembar kerja data populasi ternak ruminansia, unggas, monogastrik serta tonase produksi daging dan telur se-Kabupaten Kebumen.
+          </p>
         </div>
 
-        {/* =========================================
-            BAGIAN BAWAH: PRODUKSI TERNAK
-        ========================================= */}
-        <div className="bg-[#081824]/60 backdrop-blur-xl p-8 md:p-10 rounded-[2rem] shadow-2xl border border-blue-500/20 relative overflow-hidden group">
-          <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-600 via-blue-400 to-blue-600" />
+        {/* ── 2 MAIN MODULE CARDS (POPULASI & PRODUKSI) ── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
+          
+          {/* SECTION 1: POPULASI */}
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm flex flex-col justify-between space-y-6">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-xs">
+                  <BarChart3 size={24} strokeWidth={2.5} />
+                </div>
+                <span className="text-xs font-sans font-extrabold px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  Data Populasi
+                </span>
+              </div>
 
-          <div className="text-center mb-8">
-            <span className="text-5xl block mb-4 drop-shadow-lg group-hover:scale-110 transition-transform">
-              📈
-            </span>
-            <h2 className="text-2xl font-black text-white uppercase tracking-widest drop-shadow-md">
-              Produksi Ternak
-            </h2>
+              <div>
+                <h3 className="text-xl font-extrabold text-slate-900 mb-1">
+                  Populasi Ternak Kabupaten
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                  Rangkuman jumlah ternak ruminansia besar, kecil, babi, unggas, dan aneka ternak per desa dan kecamatan se-Kabupaten Kebumen.
+                </p>
+              </div>
+            </div>
+
+            {/* Quick Cards Grid for Populasi */}
+            <div className="space-y-3 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Link
+                  href="/bitpro/populasi-dan-produksi/2025"
+                  className="p-4 rounded-2xl border border-slate-200 bg-slate-50 hover:bg-white hover:border-emerald-600 hover:shadow-sm transition-all text-left flex flex-col justify-between min-h-[90px] group"
+                >
+                  <span className="text-[11px] font-bold text-slate-500 uppercase">2025 (Paten)</span>
+                  <span className="font-extrabold text-sm text-slate-900 group-hover:text-emerald-700 transition-colors flex items-center justify-between">
+                    <span>Populasi 2025</span>
+                    <ChevronRight size={16} className="text-slate-400 group-hover:text-emerald-600" />
+                  </span>
+                </Link>
+
+                <Link
+                  href="/bitpro/populasi-dan-produksi/2026"
+                  className="p-4 rounded-2xl border border-emerald-300 bg-emerald-50/60 hover:bg-white hover:border-emerald-600 hover:shadow-sm transition-all text-left flex flex-col justify-between min-h-[90px] group"
+                >
+                  <span className="text-[11px] font-extrabold text-emerald-700 uppercase">2026 (Aktif)</span>
+                  <span className="font-extrabold text-sm text-slate-900 group-hover:text-emerald-700 transition-colors flex items-center justify-between">
+                    <span>Populasi 2026</span>
+                    <ChevronRight size={16} className="text-emerald-600" />
+                  </span>
+                </Link>
+
+                {extraYears.map((yr) => (
+                  <Link
+                    key={yr}
+                    href={`/bitpro/populasi-dan-produksi/2026?year=${yr}`}
+                    className="p-4 rounded-2xl border border-slate-200 bg-white hover:border-emerald-600 hover:shadow-sm transition-all text-left flex flex-col justify-between min-h-[90px] group"
+                  >
+                    <span className="text-[11px] font-bold text-emerald-700 uppercase">{yr}</span>
+                    <span className="font-extrabold text-sm text-slate-800 group-hover:text-emerald-700 transition-colors flex items-center justify-between">
+                      <span>Populasi {yr}</span>
+                      <ChevronRight size={16} className="text-slate-300 group-hover:text-emerald-600" />
+                    </span>
+                  </Link>
+                ))}
+              </div>
+
+              {/* Simple Button Tambah Tahun */}
+              <button
+                type="button"
+                onClick={() => {
+                  setTargetType('populasi');
+                  setShowYearModal(true);
+                }}
+                className="w-full min-h-touch h-10 rounded-xl border border-dashed border-emerald-300 hover:border-emerald-500 bg-white hover:bg-emerald-50 text-xs font-bold text-emerald-700 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Plus size={14} strokeWidth={2.5} />
+                <span>Buka Tahun Lainnya</span>
+              </button>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <YearCard
-              href="/bitpro/populasi-dan-produksi/produksi-2025"
-              title="DATA PRODUKSI 2025"
-              theme="blue"
-            />
-            <YearCard
-              href="/bitpro/populasi-dan-produksi/produksi-2026"
-              title="DATA PRODUKSI 2026"
-              theme="blue"
-            />
+          {/* SECTION 2: PRODUKSI */}
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm flex flex-col justify-between space-y-6">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-xs">
+                  <TrendingUp size={24} strokeWidth={2.5} />
+                </div>
+                <span className="text-xs font-sans font-extrabold px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  Laporan Produksi
+                </span>
+              </div>
+
+              <div>
+                <h3 className="text-xl font-extrabold text-slate-900 mb-1">
+                  Produksi Daging &amp; Telur
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                  Rekapitulasi bulanan dan diagram proporsi lingkaran tonase daging siap potong dan produksi telur konsumsi se-Kabupaten Kebumen.
+                </p>
+              </div>
+            </div>
+
+            {/* Quick Cards Grid for Produksi */}
+            <div className="space-y-3 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Link
+                  href="/bitpro/populasi-dan-produksi/produksi-2025"
+                  className="p-4 rounded-2xl border border-slate-200 bg-slate-50 hover:bg-white hover:border-emerald-600 hover:shadow-sm transition-all text-left flex flex-col justify-between min-h-[90px] group"
+                >
+                  <span className="text-[11px] font-bold text-slate-500 uppercase">2025 (Paten)</span>
+                  <span className="font-extrabold text-sm text-slate-900 group-hover:text-emerald-700 transition-colors flex items-center justify-between">
+                    <span>Produksi 2025</span>
+                    <ChevronRight size={16} className="text-slate-400 group-hover:text-emerald-600" />
+                  </span>
+                </Link>
+
+                <Link
+                  href="/bitpro/populasi-dan-produksi/produksi-2026"
+                  className="p-4 rounded-2xl border border-emerald-300 bg-emerald-50/60 hover:bg-white hover:border-emerald-600 hover:shadow-sm transition-all text-left flex flex-col justify-between min-h-[90px] group"
+                >
+                  <span className="text-[11px] font-extrabold text-emerald-700 uppercase">2026 (Aktif)</span>
+                  <span className="font-extrabold text-sm text-slate-900 group-hover:text-emerald-700 transition-colors flex items-center justify-between">
+                    <span>Produksi 2026</span>
+                    <ChevronRight size={16} className="text-emerald-600" />
+                  </span>
+                </Link>
+
+                {extraYears.map((yr) => (
+                  <Link
+                    key={yr}
+                    href={`/bitpro/populasi-dan-produksi/produksi-2026?year=${yr}`}
+                    className="p-4 rounded-2xl border border-slate-200 bg-white hover:border-emerald-600 hover:shadow-sm transition-all text-left flex flex-col justify-between min-h-[90px] group"
+                  >
+                    <span className="text-[11px] font-bold text-emerald-700 uppercase">{yr}</span>
+                    <span className="font-extrabold text-sm text-slate-800 group-hover:text-emerald-700 transition-colors flex items-center justify-between">
+                      <span>Produksi {yr}</span>
+                      <ChevronRight size={16} className="text-slate-300 group-hover:text-emerald-600" />
+                    </span>
+                  </Link>
+                ))}
+              </div>
+
+              {/* Simple Button Tambah Tahun */}
+              <button
+                type="button"
+                onClick={() => {
+                  setTargetType('produksi');
+                  setShowYearModal(true);
+                }}
+                className="w-full min-h-touch h-10 rounded-xl border border-dashed border-emerald-300 hover:border-emerald-500 bg-white hover:bg-emerald-50 text-xs font-bold text-emerald-700 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Plus size={14} strokeWidth={2.5} />
+                <span>Buka Tahun Lainnya</span>
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+      </main>
+
+      {/* ── SIMPLE MODAL TAMBAH TAHUN ── */}
+      {showYearModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-sm w-full shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <h3 className="font-bold text-slate-900 text-base">
+                Buka Data Tahun Lain
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowYearModal(false)}
+                className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center font-bold text-xs"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                Ketik Angka Tahun
+              </label>
+              <input
+                type="number"
+                min="2000"
+                max="2100"
+                value={inputYear}
+                onChange={(e) => setInputYear(e.target.value)}
+                className="w-full min-h-touch h-11 px-3.5 rounded-xl border border-slate-200 bg-slate-50 text-base font-bold text-slate-900 focus:bg-white focus:border-emerald-600 outline-none shadow-2xs"
+                placeholder="Contoh: 2028"
+                autoFocus
+              />
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowYearModal(false)}
+                className="min-h-touch h-10 px-4 rounded-xl border border-slate-200 bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => handleOpenYear(Number(inputYear), targetType)}
+                className="flex-1 min-h-touch h-10 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold shadow-xs transition-all cursor-pointer"
+              >
+                Buka Data →
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
     </div>
   );
 }
